@@ -8,7 +8,15 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/sendfile.h>
+#include <signal.h>
+#include <sys/select.h>
 
+volatile sig_atomic_t stop = 0;
+void handle_sigint(int sig) {
+    (void)sig; // Unused parameter
+    printf("\nReceived SIGINT, stopping server...\n");
+    stop = 1;
+}
 
 int create_and_bind_socket(long port) {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -36,6 +44,12 @@ void handle_client_request(int client_fd) {
     char buffer[1024] = {0}; // Buffer to store incoming data
     ssize_t bytes_received = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
     if (bytes_received < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            printf("No data received, client may have closed the connection\n");
+            close(client_fd);
+            return;
+        }
+        // Handle other errors
         perror("Receive failed");
         close(client_fd);
         return;
@@ -70,12 +84,15 @@ void handle_client_request(int client_fd) {
     // Send the response header
     send(client_fd, response, strlen(response), 0);
     // 7. Send the response back to the client
+    printf("Sending file of size %ld bytes\n", file_size);
     sendfile(client_fd, file_fd, NULL, 256); // Send the file to the client
+    printf("File sent successfully\n");
     close(file_fd); // Close the file descriptor
     close(client_fd); // Close the client socket
 }
 
 int main(int argc, char* argv[]) {
+    signal(SIGINT, handle_sigint); // Register signal handler for SIGINT
     char* port_string = argv[1];
     if (port_string == NULL) {
         fprintf(stderr, "Usage: %s <port>\n", argv[0]);
@@ -100,20 +117,53 @@ int main(int argc, char* argv[]) {
     }
     printf("Listening on port 8080...\n");
     // 3. Accept incoming connections
-    bool running = true;
 
-    while (running) {
-        struct sockaddr_in client_addr;
-        socklen_t addr_len = sizeof(client_addr);
-        int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
-        if (client_fd < 0) {
-            perror("Accept failed");
+    while (!stop) {
+        fd_set read_fds;
+        FD_ZERO(&read_fds);
+        FD_SET(socket_fd, &read_fds);
+        struct timeval timeout;
+        timeout.tv_sec = 1; // 1 second timeout
+        timeout.tv_usec = 0;
+        int activity = select(socket_fd + 1, &read_fds, NULL, NULL, &timeout);
+        if (activity < 0) {
+            perror("Select failed");
             close(socket_fd);
             return 1;
         }
-        printf("Accepted connection from %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
-        // 4. Handle the client request
-        handle_client_request(client_fd);
+
+        if (stop) {
+            break;
+        }
+
+        if (FD_ISSET(socket_fd, &read_fds)) {
+            // Accept a new connection
+            struct sockaddr_in client_addr;
+            socklen_t addr_len = sizeof(client_addr);
+            int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
+            if (client_fd < 0) {
+                perror("Accept failed");
+                continue; // Continue to the next iteration
+            }
+            // Set the client socket to non-blocking mode
+            // int flags = fcntl(client_fd, F_GETFL, 0);
+            // if (flags == -1) {
+            //     perror("fcntl failed");
+            //     close(client_fd);
+            //     continue; // Continue to the next iteration
+            // }
+            // if (fcntl(client_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+            //     perror("fcntl failed");
+            //     close(client_fd);
+            //     continue; // Continue to the next iteration
+            // }
+            // Print the client's IP address and port
+            char client_ip[INET_ADDRSTRLEN];
+            inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+            printf("Accepted connection from %s:%d\n", client_ip, ntohs(client_addr.sin_port));
+            // 4. Handle the client request
+            handle_client_request(client_fd);
+        }
     }
 
     // 8. Close the socket
