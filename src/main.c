@@ -102,6 +102,7 @@ void handle_client_request(int client_fd) {
     // 7. Send the response back to the client
     printf("Sending file of size %ld bytes\n", file_size);
     send(client_fd, file_data, file_size, 0); // Send the file to the client
+    free(file_data);
     printf("File sent successfully\n");
     close(file_fd); // Close the file descriptor
     close(client_fd); // Close the client socket
@@ -137,6 +138,7 @@ int main(int argc, char* argv[]) {
     snprintf(port_str, length, "%ld", port);
 
     printf("Listening on port %s...\n", port_string);
+    free(port_str);
     // 3. Accept incoming connections
 
     while (!stop) {
