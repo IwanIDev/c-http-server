@@ -26,10 +26,11 @@ int create_and_bind_socket(long port) {
         return -1;
     }
 
-    struct sockaddr_in server_addr;
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(port);
+    struct sockaddr_in server_addr = {
+      .sin_family = AF_INET,
+      .sin_addr.s_addr = INADDR_ANY,
+      .sin_port = htons(port)
+    };
 
     if (bind(sock_fd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0) {
         perror("Bind failed");
@@ -145,18 +146,6 @@ int main(int argc, char* argv[]) {
                 perror("Accept failed");
                 continue; // Continue to the next iteration
             }
-            // Set the client socket to non-blocking mode
-            // int flags = fcntl(client_fd, F_GETFL, 0);
-            // if (flags == -1) {
-            //     perror("fcntl failed");
-            //     close(client_fd);
-            //     continue; // Continue to the next iteration
-            // }
-            // if (fcntl(client_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
-            //     perror("fcntl failed");
-            //     close(client_fd);
-            //     continue; // Continue to the next iteration
-            // }
             // Print the client's IP address and port
             char client_ip[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
