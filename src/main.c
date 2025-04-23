@@ -58,7 +58,7 @@ void handle_client_request(int client_fd) {
     buffer[bytes_received] = '\0'; // Null-terminate the received data
     printf("Received request: %s\n", buffer);
 
-        // This server will only accept GET requests
+    // This server will only accept GET requests
     // GET /index.html for example
     char* file = buffer + 5; // Skip "GET /"
     *strchr(file, ' ') = '\0'; // Null-terminate at the first space
@@ -79,6 +79,21 @@ void handle_client_request(int client_fd) {
     // Get the file size
     off_t file_size = lseek(file_fd, 0, SEEK_END);
     lseek(file_fd, 0, SEEK_SET); // Reset the file offset
+    if (file_size < 0) {
+        perror("lseek failed");
+        close(file_fd);
+        close(client_fd);
+        return;
+    }
+    void* file_data = malloc(file_size); // Allocate memory for the file file_data
+    if (read(file_fd, file_data, file_size) != file_size) {
+        perror("File read failed");
+        free(file_data);
+        close(file_fd);
+        close(client_fd);
+        return;
+    }
+
     // Create the response header
     char response[256];
     snprintf(response, sizeof(response), "%s%ld\r\n\r\n", response_header, file_size);
@@ -86,7 +101,7 @@ void handle_client_request(int client_fd) {
     send(client_fd, response, strlen(response), 0);
     // 7. Send the response back to the client
     printf("Sending file of size %ld bytes\n", file_size);
-    sendfile(client_fd, file_fd, NULL, 256); // Send the file to the client
+    send(client_fd, file_data, file_size, 0); // Send the file to the client
     printf("File sent successfully\n");
     close(file_fd); // Close the file descriptor
     close(client_fd); // Close the client socket
