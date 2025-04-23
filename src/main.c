@@ -43,7 +43,7 @@ int create_and_bind_socket(long port) {
     return sock_fd;
 }
 
-void handle_client_request(int client_fd) {
+char* recieve_client_request(int client_fd) {
     char* buffer = malloc(BUFFER_SIZE); // Buffer to store incoming data
     int total_recieved = 0;
     while (1) {
@@ -53,13 +53,13 @@ void handle_client_request(int client_fd) {
             printf("No data received, client may have closed the connection\n");
             free(buffer);
             close(client_fd);
-            return;
+            return NULL;
         }
         // Handle other errors
         perror("Receive failed");
         free(buffer);
         close(client_fd);
-        return;
+        return NULL;
       }
 
       total_recieved += bytes_received;
@@ -75,8 +75,16 @@ void handle_client_request(int client_fd) {
           printf("Buffer limit reached, closing connection\n");
           free(buffer);
           close(client_fd);
-          return;
+          return NULL;
       }
+    }
+    return buffer;
+}
+
+void handle_client_request(int client_fd) {
+    char* buffer = recieve_client_request(client_fd);
+    if (buffer == NULL) {
+        return; // Error in receiving request
     }
     printf("Received request: %s\n", buffer);
 
