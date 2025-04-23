@@ -144,21 +144,27 @@ void handle_client_request(int client_fd) {
     close(client_fd); // Close the client socket
 }
 
+long string_to_long(const char* str) {
+    char* endptr;
+    errno = 0; // Reset errno before strtol
+    long value = strtol(str, &endptr, 10);
+    if (errno != 0 || *endptr != '\0') {
+        fprintf(stderr, "Invalid number: %s\n", str);
+        return -1;
+    }
+    return value;
+}
+
 int main(int argc, char* argv[]) {
     signal(SIGINT, handle_sigint); // Register signal handler for SIGINT
-    char* port_string = argv[1];
+    const char* port_string = argv[1];
     if (port_string == NULL) {
         fprintf(stderr, "Usage: %s <port>\n", argv[0]);
         return 1;
     }
+    
+    long port = string_to_long(port_string);
 
-    char* endptr;
-    errno = 0; // Reset errno before strtol
-    long port = strtol(port_string, &endptr, 10);
-    if (errno != 0) {
-        perror("Invalid port number");
-        return 1;
-    }
     int socket_fd = create_and_bind_socket(port);
 
     // 2. Listen on the socket

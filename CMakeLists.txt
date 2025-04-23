@@ -1,13 +1,15 @@
 cmake_minimum_required(VERSION 3.10)
 
 # Project name
-project(c_http_server)
+project(c-http-server)
 
 # Set the C standard
 set(CMAKE_C_STANDARD 99)
 
+file(GLOB_RECURSE SRC src/*.c)
+
 # Add the executable
-add_executable(c_http_server src/main.c)
+add_executable(${PROJECT_NAME} ${SRC})
 
 # Include directories (if any)
 include_directories(include)
