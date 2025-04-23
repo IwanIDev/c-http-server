@@ -169,12 +169,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     // Get port number as string
-    int length = snprintf(NULL, 0, "%ld", port);
-    char* port_str = calloc(length, sizeof(char));
-    snprintf(port_str, length, "%ld", port);
-
     printf("Listening on port %s...\n", port_string);
-    free(port_str);
     // 3. Accept incoming connections
 
     while (!stop) {
