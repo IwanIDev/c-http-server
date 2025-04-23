@@ -13,11 +13,11 @@
 
 #define BUFFER_SIZE 4096
 
-volatile sig_atomic_t stop = 0;
+volatile sig_atomic_t stop = false;
 void handle_sigint(int sig) {
     (void)sig; // Unused parameter
     printf("\nReceived SIGINT, stopping server...\n");
-    stop = 1;
+    stop = true;
 }
 
 int create_and_bind_socket(long port) {
