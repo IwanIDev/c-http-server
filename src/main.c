@@ -116,7 +116,12 @@ int main(int argc, char* argv[]) {
         close(socket_fd);
         return 1;
     }
-    printf("Listening on port 8080...\n");
+    // Get port number as string
+    int length = snprintf(NULL, 0, "%ld", port);
+    char* port_str = calloc(length, sizeof(char));
+    snprintf(port_str, length, "%ld", port);
+
+    printf("Listening on port %s...\n", port_string);
     // 3. Accept incoming connections
 
     while (!stop) {
