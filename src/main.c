@@ -11,6 +11,8 @@
 #include <signal.h>
 #include <sys/select.h>
 
+#define BUFFER_SIZE 4096
+
 volatile sig_atomic_t stop = 0;
 void handle_sigint(int sig) {
     (void)sig; // Unused parameter
@@ -42,27 +44,53 @@ int create_and_bind_socket(long port) {
 }
 
 void handle_client_request(int client_fd) {
-    char buffer[1024] = {0}; // Buffer to store incoming data
-    ssize_t bytes_received = recv(client_fd, buffer, sizeof(buffer) - 1, 0);
-    if (bytes_received < 0) {
+    char* buffer = malloc(BUFFER_SIZE); // Buffer to store incoming data
+    int total_recieved = 0;
+    while (1) {
+      ssize_t bytes_received = recv(client_fd, buffer + total_recieved, BUFFER_SIZE - total_recieved - 1, 0);
+      if (bytes_received <= 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
             printf("No data received, client may have closed the connection\n");
+            free(buffer);
             close(client_fd);
             return;
         }
         // Handle other errors
         perror("Receive failed");
+        free(buffer);
         close(client_fd);
         return;
+      }
+
+      total_recieved += bytes_received;
+      buffer[total_recieved] = '\0'; // Null-terminate the received data
+    
+      // Check if we have received the full request
+      if (strstr(buffer, "\r\n\r\n") != NULL) {
+          break; // End of HTTP request
+      }
+
+      // Check if we have reached the buffer limit
+      if (total_recieved >= BUFFER_SIZE - 1) {
+          printf("Buffer limit reached, closing connection\n");
+          free(buffer);
+          close(client_fd);
+          return;
+      }
     }
-    buffer[bytes_received] = '\0'; // Null-terminate the received data
     printf("Received request: %s\n", buffer);
 
     // This server will only accept GET requests
     // GET /index.html for example
     char* file = buffer + 5; // Skip "GET /"
-    *strchr(file, ' ') = '\0'; // Null-terminate at the first space
+    char* end_of_file = strchr(file, ' '); // Find the first space after the file name 
+    if (end_of_file == NULL) {
+      printf("Malformed request\n");
+      return;
+    }
+    *end_of_file = '\0'; // Null-terminate the file name
     printf("Requested file: %s\n", file);
+    free(buffer); // Free the request buffer
     // Open the requested file
     int file_fd = open(file, O_RDONLY);
     if (file_fd < 0) {
