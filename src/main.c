@@ -109,11 +109,19 @@ void handle_client_request(int client_fd) {
       return;
     }
     // Open the requested file
+    errno = 0;
     int file_fd = open(file, O_RDONLY);
     if (file_fd < 0) {
         perror("File open failed");
-        const char* not_found_response = "HTTP/1.1 404 Not Found\r\n\r\n";
-        send(client_fd, not_found_response, strlen(not_found_response), 0);
+        if (errno == ENOENT) {
+          // File is not found, responding with 404.
+          const char* not_found_response = "HTTP/1.1 404 Not Found\r\n\r\n";
+          send(client_fd, not_found_response, strlen(not_found_response), 0);
+        } else {
+          // If the error is not one of above, we respond with generic 400 client error.
+          const char* not_found_response = "HTTP/1.1 404 Not Found\r\n\r\n";
+          send(client_fd, not_found_response, strlen(not_found_response), 0);
+        }
         close(client_fd);
         return;
     }
