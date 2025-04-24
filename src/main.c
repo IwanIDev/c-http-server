@@ -81,6 +81,20 @@ char* recieve_client_request(int client_fd) {
     return buffer;
 }
 
+char* parse_get_request(char* request) {
+    // GET /index.html for example
+    char* file = request + 5; // Skip "GET /"
+    char* end_of_file = strchr(file, ' '); // Find the first space after the file name 
+    if (end_of_file == NULL) {
+      printf("Malformed request\n");
+      return NULL;
+    }
+    *end_of_file = '\0'; // Null-terminate the file name
+    printf("Requested file: %s\n", file);
+    free(request); // Free the request buffer
+    return file; // Return the file name
+}
+
 void handle_client_request(int client_fd) {
     char* buffer = recieve_client_request(client_fd);
     if (buffer == NULL) {
@@ -89,16 +103,11 @@ void handle_client_request(int client_fd) {
     printf("Received request: %s\n", buffer);
 
     // This server will only accept GET requests
-    // GET /index.html for example
-    char* file = buffer + 5; // Skip "GET /"
-    char* end_of_file = strchr(file, ' '); // Find the first space after the file name 
-    if (end_of_file == NULL) {
-      printf("Malformed request\n");
+    char* file = parse_get_request(buffer);
+    if (file == NULL) {
+      printf("Unable to parse file path in GET request");
       return;
     }
-    *end_of_file = '\0'; // Null-terminate the file name
-    printf("Requested file: %s\n", file);
-    free(buffer); // Free the request buffer
     // Open the requested file
     int file_fd = open(file, O_RDONLY);
     if (file_fd < 0) {
