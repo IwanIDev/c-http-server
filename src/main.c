@@ -28,6 +28,13 @@ int create_and_bind_socket(long port) {
         perror("Socket creation failed");
         return -1;
     }
+    
+    int opt = 1;
+    if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
+        perror("setsockopt failed");
+        close(sock_fd);
+        return -1;
+    }
 
     struct sockaddr_in server_addr = {
       .sin_family = AF_INET,
@@ -41,6 +48,18 @@ int create_and_bind_socket(long port) {
         return -1;
     }
 
+    // Set the socket to non-blocking mode
+    int flags = fcntl(sock_fd, F_GETFL, 0);
+    if (flags == -1) {
+      perror("fcntl F_GETFL failed");
+      close(sock_fd);
+      return -1;
+    }
+    if (fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK) == -1) {
+      perror("fcntl F_SETFL failed");
+      close(sock_fd);
+      return -1;
+    }
     return sock_fd;
 }
 
@@ -51,10 +70,9 @@ char* recieve_client_request(int client_fd) {
       ssize_t bytes_received = recv(client_fd, buffer + total_recieved, BUFFER_SIZE - total_recieved - 1, 0);
       if (bytes_received <= 0) {
         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            printf("No data received, client may have closed the connection\n");
-            free(buffer);
-            close(client_fd);
-            return NULL;
+          // No data received, waiting 1ms (arbritrary) before retrying
+          usleep(1000);
+          continue; // Retry receiving data
         }
         // Handle other errors
         perror("Receive failed");
@@ -82,7 +100,7 @@ char* recieve_client_request(int client_fd) {
     return buffer;
 }
 
-/* * Parses the GET request and extracts the file path.
+/** Parses the GET request and extracts the file path.
  * Returns a dynamically allocated string containing the file path.
  * The caller is responsible for freeing the returned string.
  */
@@ -91,7 +109,7 @@ char* parse_get_request(const char* request) {
         printf("Not a GET request\n");
         return NULL; // Not a GET request
     }
-    const char* file_start = request + 4; // Skip "GET "
+    const char* file_start = request + 5; // Skip "GET /"
     const char* end_of_file = strchr(file_start, ' '); // Find the first space after the file name
     if (end_of_file == NULL) {
       printf("Malformed request\n");
@@ -238,8 +256,13 @@ int main(int argc, char* argv[]) {
             socklen_t addr_len = sizeof(client_addr);
             int client_fd = accept(socket_fd, (struct sockaddr *)&client_addr, &addr_len);
             if (client_fd < 0) {
+              if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No incoming connections, continue to the next iteration
+                continue;
+              } else {
                 perror("Accept failed");
                 continue; // Continue to the next iteration
+              }
             }
             // Print the client's IP address and port
             char client_ip[INET_ADDRSTRLEN];
