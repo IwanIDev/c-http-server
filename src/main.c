@@ -81,22 +81,36 @@ char* recieve_client_request(int client_fd) {
     return buffer;
 }
 
-char* parse_get_request(char* request) {
-    // GET /index.html for example
-    char* file = request + 5; // Skip "GET /"
-    char* end_of_file = strchr(file, ' '); // Find the first space after the file name 
+/* * Parses the GET request and extracts the file path.
+ * Returns a dynamically allocated string containing the file path.
+ * The caller is responsible for freeing the returned string.
+ */
+char* parse_get_request(const char* request) {
+    if (strncmp(request, "GET ", 4) != 0) {
+        printf("Not a GET request\n");
+        return NULL; // Not a GET request
+    }
+    const char* file_start = request + 4; // Skip "GET "
+    const char* end_of_file = strchr(file_start, ' '); // Find the first space after the file name
     if (end_of_file == NULL) {
       printf("Malformed request\n");
       return NULL;
     }
-    *end_of_file = '\0'; // Null-terminate the file name
-    printf("Requested file: %s\n", file);
-    free(request); // Free the request buffer
-    return file; // Return the file name
+    size_t file_length = end_of_file - file_start; // Calculate the length of the file name
+    char* file_path = malloc(file_length + 1); // Allocate memory for the file name
+    if (file_path == NULL) {
+        perror("Memory allocation failed");
+        return NULL; // Memory allocation failed
+    }
+
+    memcpy(file_path, file_start, file_length); // Copy the file name
+    file_path[file_length] = '\0'; // Null-terminate the file name
+    printf("Requested file: %s\n", file_path);
+    return file_path; // Return the file name
 }
 
 void handle_client_request(int client_fd) {
-    char* buffer = recieve_client_request(client_fd);
+    char* buffer = recieve_client_request(client_fd); // Buffer created here!
     if (buffer == NULL) {
         return; // Error in receiving request
     }
@@ -104,6 +118,7 @@ void handle_client_request(int client_fd) {
 
     // This server will only accept GET requests
     char* file = parse_get_request(buffer);
+    free(buffer); // Free the buffer after parsing
     if (file == NULL) {
       printf("Unable to parse file path in GET request");
       return;
@@ -118,9 +133,9 @@ void handle_client_request(int client_fd) {
           const char* not_found_response = "HTTP/1.1 404 Not Found\r\n\r\n";
           send(client_fd, not_found_response, strlen(not_found_response), 0);
         } else {
-          // If the error is not one of above, we respond with generic 400 client error.
-          const char* not_found_response = "HTTP/1.1 404 Not Found\r\n\r\n";
-          send(client_fd, not_found_response, strlen(not_found_response), 0);
+          // If the error is not one of above, we respond with generic 500 server error.
+          const char* server_error_response = "HTTP/1.1 500 Internal Server Error\r\n\r\n";
+          send(client_fd, server_error_response, strlen(server_error_response), 0);
         }
         close(client_fd);
         return;
@@ -204,6 +219,9 @@ int main(int argc, char* argv[]) {
         timeout.tv_usec = 0;
         int activity = select(socket_fd + 1, &read_fds, NULL, NULL, &timeout);
         if (activity < 0) {
+            if (errno == EINTR) {
+                continue; // Interrupted by signal, continue
+            }
             perror("Select failed");
             close(socket_fd);
             return 1;

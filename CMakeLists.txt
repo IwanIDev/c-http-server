@@ -7,6 +7,7 @@ project(c-http-server)
 set(CMAKE_C_STANDARD 99)
 
 file(GLOB_RECURSE SRC src/*.c)
+# Set the output directory for the executable
 
 # Add the executable
 add_executable(${PROJECT_NAME} ${SRC})
