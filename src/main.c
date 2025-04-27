@@ -16,7 +16,8 @@
 volatile sig_atomic_t stop = false;
 void handle_sigint(int sig) {
     (void)sig; // Unused parameter
-    printf("\nReceived SIGINT, stopping server...\n");
+    const char message[] = "Recieved SIGINT, stopping server...\n"; 
+    write(STDOUT_FILENO, message, sizeof(message) - 1); // Printf is not async-signal-safe, using write instead
     stop = true;
 }
 
