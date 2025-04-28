@@ -21,6 +21,9 @@ void handle_sigint(int sig) {
     stop = true;
 }
 
+/** Creates a socket, binds it to the specified port, and sets it to non-blocking mode.
+ * Returns the socket file descriptor on success, or -1 on failure.
+ */
 int create_and_bind_socket(long port) {
     int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
 
@@ -63,6 +66,10 @@ int create_and_bind_socket(long port) {
     return sock_fd;
 }
 
+/** Receives data from the client socket in a non-blocking manner.
+ * Returns a dynamically allocated buffer containing the received data.
+ * The caller is responsible for freeing the returned buffer.
+ */
 char* recieve_client_request(int client_fd) {
     char* buffer = malloc(BUFFER_SIZE); // Buffer to store incoming data
     int total_recieved = 0;
@@ -128,6 +135,9 @@ char* parse_get_request(const char* request) {
     return file_path; // Return the file name
 }
 
+/** Handles the client request by receiving the request, parsing it, and sending the response. 
+ *  The function does not return a value.
+ */
 void handle_client_request(int client_fd) {
     char* buffer = recieve_client_request(client_fd); // Buffer created here!
     if (buffer == NULL) {
@@ -195,6 +205,9 @@ void handle_client_request(int client_fd) {
     close(client_fd); // Close the client socket
 }
 
+/** Converts a string to a long integer.
+ * Returns the converted long integer, or -1 on failure.
+ */
 long string_to_long(const char* str) {
     char* endptr;
     errno = 0; // Reset errno before strtol
